@@ -15,7 +15,7 @@ abstract class MyList[+A] {
   def ++[B >: A](list: MyList[B]): MyList[B]
 }
 
-object Empty extends MyList[Nothing] {
+case object Empty extends MyList[Nothing] {
 
   def head: Nothing = throw new NoSuchElementException
   def tail: MyList[Nothing] =  throw new NoSuchElementException
@@ -30,7 +30,7 @@ object Empty extends MyList[Nothing] {
 
 }
 
-class Cons[+A](h: A, t: MyList[A]) extends MyList[A] {
+case class Cons[+A](h: A, t: MyList[A]) extends MyList[A] {
 
   def head: A = h
   def tail: MyList[A] = t
@@ -87,4 +87,7 @@ object ListTest extends App {
   println(listOfIntegers.flatMap(new MyTransformer[Int, MyList[Int]] {
     override def transform(thing: Int): MyList[Int] = new Cons(thing, new Cons(thing + 1, Empty))
   }).toString)
+  val cloneListOfIntegers: MyList[Int] = new Cons(1, new Cons(2, new Cons(3, Empty)))
+  // using case class equals method. works because Cons is a case class. no need to implement equals method
+  println(cloneListOfIntegers == listOfIntegers)
 }
