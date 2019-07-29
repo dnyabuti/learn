@@ -12,7 +12,7 @@ object PackagingAndImports extends App {
 
   // imports package_name.{imports separated by comma} or package_name._ to import all
   val t1 = Test1
-  val t2 = Te
+  val t2 = Test2
 
   // create alias by using class/object name => newName
   val date = new Date
