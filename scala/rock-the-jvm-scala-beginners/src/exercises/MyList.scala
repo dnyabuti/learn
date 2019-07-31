@@ -126,4 +126,11 @@ object ListTest extends App {
   println(anotherListOfIntegers.zipWith(listOfStrings, (x: Int,y: String) => x + "-"+ y))
 
   println(anotherListOfIntegers.fold(1)(_ + _))
+
+  val combinations = for {
+    n <- listOfIntegers
+    string <- listOfStrings
+  } yield n + "+" + string
+
+  println(combinations)
 }
