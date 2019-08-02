@@ -2,11 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="593379f6-b16f-4c83-aeb1-786665fbaa80" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/src/lectures/part4pm/AllThePatterns.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/lectures/part4pm/PatternsEverywhere.scala" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../file_system/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../file_system/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/lectures/part4pm/PatternMatching.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/lectures/part4pm/PatternMatching.scala" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -185,6 +181,17 @@
         </entry>
       </map>
     </option>
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="scala-line">
+          <url>file://$PROJECT_DIR$/src/lectures/part4pm/PatternsEverywhere.scala</url>
+          <line>27</line>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
   <component name="antWorkspaceConfiguration">
     <option name="IS_AUTOSCROLL_TO_SOURCE" value="false" />
