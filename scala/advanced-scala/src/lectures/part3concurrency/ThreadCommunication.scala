@@ -129,7 +129,7 @@ object ThreadCommunication extends App {
     }
   }
 
-  class Producer(id: Int, buffer: mutable.Queue, capacity: Int) extends Thread {
+  class Producer(id: Int, buffer: mutable.Queue[Int], capacity: Int) extends Thread {
     override def run(): Unit = {
       val random = new Random()
       var i =0
@@ -156,7 +156,7 @@ object ThreadCommunication extends App {
     val capacity =3
 
     (1 to nConsumers).foreach(i => new Consumer(i, buffer).start())
-    (1 to nProducers).foreach(i => new Producer(i, buffer).start())
+    (1 to nProducers).foreach(i => new Producer(i, buffer, capacity).start())
   }
 
   multiProdCons(3, 3)
