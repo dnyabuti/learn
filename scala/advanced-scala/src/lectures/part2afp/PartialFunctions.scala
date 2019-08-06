@@ -76,5 +76,5 @@ object PartialFunctions extends App {
     case "goodbye" => "bye human"
     case "call mom" => "unable to find your phone"
   }
-  scala.io.Source.stdin.getLines().flatMap(chatbot.lift).foreach(println)
+  scala.io.Source.stdin.getLines().map(chatbot.lift).foreach(println)
  }
