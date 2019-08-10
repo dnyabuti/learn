@@ -2,16 +2,19 @@ package part4_advanced_clustering
 
 import java.util.{Date, UUID}
 
-import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props, ReceiveTimeout}
+import akka.cluster.sharding.ShardRegion.Passivate
 import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings, ShardRegion}
 import com.typesafe.config.ConfigFactory
 
+import scala.concurrent.duration._
 import scala.util.Random
 
 case class OysterCard(id: String, amount: Double)
 case class EntryAttempt(oysterCard: OysterCard, date: Date)
 case object EntryAccepted
 case class EntryRejected(reason: String)
+case object TerminateValidator
 
 ////////////////////////////////
 // Actors
@@ -34,12 +37,17 @@ class OysterClassValidator extends Actor with ActorLogging {
   override def preStart(): Unit = {
     super.preStart()
     log.info(s"Validator starting")
+    context.setReceiveTimeout(10 seconds)
   }
 
   override def receive: Receive = {
     case EntryAttempt(card @ OysterCard(id, amount),_) =>
       if (amount > 2.5) sender() ! EntryAccepted
       else sender() ! EntryRejected(s"[$id] not enough funds. please top up")
+    case ReceiveTimeout =>
+      context.parent ! Passivate(TerminateValidator)
+    case TerminateValidator => // no more messages will be received
+    context.stop(self)
   }
 }
 
@@ -61,6 +69,8 @@ object TurnstileSettings {
    case attempt @ EntryAttempt(OysterCard(cardId, _), _) =>
      val shardId = cardId.hashCode.abs  % numberOfShards
      shardId.toString
+   case ShardRegion.StartEntity(entityId) =>
+     (entityId.toLong % numberOfShards).toString
  }
 }
 
@@ -80,7 +90,7 @@ class TubeStation(port: Int, numberOfTurnstiles: Int) extends App {
   val validatorShardRegionRef = ClusterSharding(system).start(
     typeName = "OysterCardValidator",
     entityProps = Props[OysterClassValidator],
-    settings = ClusterShardingSettings(system),
+    settings = ClusterShardingSettings(system).withRememberEntities(true),
     extractEntityId = TurnstileSettings.extractEntityId,
     extractShardId = TurnstileSettings.extractShardId
   )
