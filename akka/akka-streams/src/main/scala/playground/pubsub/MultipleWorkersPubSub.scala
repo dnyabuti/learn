@@ -1,12 +1,11 @@
-package playground
+package playground.pubsub
 
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props, ReceiveTimeout}
-import akka.routing.FromConfig
+import akka.cluster.pubsub.DistributedPubSub
+import akka.cluster.pubsub.DistributedPubSubMediator.Send
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Sink, Source}
-import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
-import playground.pubsub.MasterWithRouter
 
 import scala.concurrent.Future
 
@@ -18,32 +17,41 @@ case class SimpleTask(contents: String)
 case object StartWork
 
 class Worker extends Actor with ActorLogging {
-  import context.dispatcher
-  import scala.concurrent.duration._
-  context.setReceiveTimeout(2 second)
+  import akka.cluster.pubsub.DistributedPubSubMediator.Put
 
-  var messageSource: ActorRef = null
+  import scala.concurrent.duration._
+  val mediator = DistributedPubSub(context.system).mediator
+  // register to the path
+  mediator ! Put(self)
+
+  context.setReceiveTimeout(1 minute)
+
+  override def preStart(): Unit = sendAck // request data on startup
 
   override def receive: Receive = {
     case SimpleTask(id) =>
       Thread.sleep(100) // mimic long running process
       log.info(s"Message: $id has been received")
-      messageSource = sender()
-      sender() ! StreamAck
+      sendAck
 
     case ReceiveTimeout =>
-      if (messageSource != null ) {
-        log.warning("Idle worker... equesting work...")
-        messageSource ! StreamAck // request more work
-      }
+        log.warning("Idle worker... requesting work...")
+        context.setReceiveTimeout(context.receiveTimeout * 2)
+        sendAck
     case m: Any => log.warning(s"${self.path} could not process message: $m")
   }
+
+  def sendAck: Unit = mediator ! Send(path = "/user/master", msg = StreamAck, localAffinity = false)
 }
 
 class MasterWithRouter extends Actor with ActorLogging {
 
-  val router = context.actorOf(FromConfig.props(Props[pubsub.Worker]), "clusterAwareRouter")
   var parent: ActorRef = null
+
+  import akka.cluster.pubsub.DistributedPubSubMediator.Put
+  val mediator = DistributedPubSub(context.system).mediator
+  // register to the path
+  mediator ! Put(self)
 
   override def receive: Receive = {
     case StartWork =>
@@ -54,7 +62,7 @@ class MasterWithRouter extends Actor with ActorLogging {
       parent = sender()
     case m: SimpleTask =>
       log.info(s"Forwarding work: $m to routees")
-      router.tell(m, sender())
+      mediator ! Send(path = "/user/worker", msg = m, localAffinity = false)
     case StreamComplete =>
       log.info("Stream complete")
       context.stop(self)
@@ -69,7 +77,7 @@ class MasterWithRouter extends Actor with ActorLogging {
   }
 }
 
-object RouteesApp extends App {
+object StartWorkerNodes extends App {
   def startRouteeNode(port: Int) = {
     val config = ConfigFactory.parseString(
       s"""
@@ -78,15 +86,15 @@ object RouteesApp extends App {
     ).withFallback(ConfigFactory.load("playground/application.conf"))
 
     val system = ActorSystem("DavisCluster", config)
-    system.actorOf(Props[pubsub.Worker], "worker")
+    system.actorOf(Props[Worker], "worker")
   }
 
   startRouteeNode(2551)
   startRouteeNode(2552)
 }
 
-object MasterWithRouterApp extends App {
-  val mainConfig = ConfigFactory.load("playground/application.conf")
+object Source1 extends App {
+  val mainConfig = ConfigFactory.load("playground/clusterPubSub.conf")
   //  val config = mainConfig.getConfig("masterWithRouterApp").withFallback(mainConfig)
   val config = mainConfig.getConfig("masterWithGroupRouterApp").withFallback(mainConfig)
 
@@ -109,7 +117,7 @@ object MasterWithRouterApp extends App {
   Source(1 to 10000).mapAsyncUnordered(parallelism = 1)(n => Future(SimpleTask(n+""))).to(actorPoweredSink).run()
 }
 
-object MoreRoutees extends App {
+object StartWorkerNodes2 extends App {
   def startRouteeNode(port: Int) = {
     val config = ConfigFactory.parseString(
       s"""
@@ -118,9 +126,32 @@ object MoreRoutees extends App {
     ).withFallback(ConfigFactory.load("playground/application.conf"))
 
     val system = ActorSystem("DavisCluster", config)
-    system.actorOf(Props[pubsub.Worker], "worker")
+    system.actorOf(Props[Worker], "worker")
   }
 
   startRouteeNode(0)
   startRouteeNode(0)
+}
+
+object Source2 extends App {
+  val mainConfig = ConfigFactory.load("playground/clusterPubSub.conf")
+  //  val config = mainConfig.getConfig("masterWithRouterApp").withFallback(mainConfig)
+
+  implicit val system = ActorSystem("DavisCluster", mainConfig)
+  implicit val materializer = ActorMaterializer()
+  val masterActor = system.actorOf(Props[MasterWithRouter], "master")
+
+
+  val actorPoweredSink = Sink.actorRefWithAck[SimpleTask](
+    masterActor,
+    onInitMessage = StreamInit,
+    onCompleteMessage = StreamComplete,
+    ackMessage = StreamAck,
+    onFailureMessage = throwable => StreamFail(throwable) // optional
+  )
+
+  Thread.sleep(10000)
+  masterActor ! StartWork
+  import system.dispatcher
+  Source(-10000 to 0).mapAsyncUnordered(parallelism = 1)(n => Future(SimpleTask(n+""))).to(actorPoweredSink).run()
 }
